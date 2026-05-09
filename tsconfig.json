@@ -3,6 +3,11 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
+    "paths": {
+      "exp-parser": [
+        "./dist/exp-parser"
+      ]
+    },
     "strict": true,
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
@@ -21,5 +26,13 @@
     "strictInputAccessModifiers": true,
     "strictTemplates": true
   },
-  "files": []
+  "files": [],
+  "references": [
+    {
+      "path": "./projects/exp-parser/tsconfig.lib.json"
+    },
+    {
+      "path": "./projects/exp-parser/tsconfig.spec.json"
+    }
+  ]
 }
