@@ -4,9 +4,7 @@
   "compileOnSave": false,
   "compilerOptions": {
     "paths": {
-      "exp-parser": [
-        "./dist/exp-parser"
-      ]
+      "exp-parser": ["./projects/exp-parser/src/index.ts"]
     },
     "strict": true,
     "noImplicitOverride": true,

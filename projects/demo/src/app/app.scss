@@ -1,0 +1,132 @@
+ .formula-parser {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+      font-family: 'Segoe UI', sans-serif;
+    }
+
+    h1 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+    h2 { color: #555; margin-top: 30px; }
+
+    .input-section {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: 'Fira Code', monospace;
+      resize: vertical;
+    }
+
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    button:hover { background: #0056b3; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+
+    .result {
+      background: #d4edda;
+      border: 1px solid #c3e6cb;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+
+    .result.error {
+      background: #f8d7da;
+      border-color: #f5c6cb;
+    }
+
+    pre {
+      background: #fff;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+
+    .section {
+      background: #fff;
+      border: 1px solid #ddd;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+
+    .variable-input, .entity-input, .formula-input {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .variable-input input, .entity-input input, .formula-input input {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+
+    .variable-list, .entity-list, .formula-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .variable-item, .entity-item, .formula-item {
+      background: #f8f9fa;
+      padding: 10px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .var-name, .field-name {
+      font-family: 'Fira Code', monospace;
+      color: #007bff;
+    }
+
+    .delete {
+      background: #dc3545;
+      padding: 5px 10px;
+      margin: 0;
+    }
+
+    .function-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .function-badge {
+      background: #e9ecef;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: 'Fira Code', monospace;
+    }
+
+    .examples {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .examples button {
+      margin: 0;
+      background: #6c757d;
+    }
+
+    .examples button:hover { background: #545b62; }
