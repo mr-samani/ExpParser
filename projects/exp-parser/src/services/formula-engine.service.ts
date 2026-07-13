@@ -13,7 +13,8 @@ import {
   EvaluationResult,
   DependencyNode,
 } from '../models/formula.model';
-import { getAllFunctionNames } from './built-in-functions';
+import { BUILT_IN_FUNCTIONS, getAllFunctionNames } from './built-in-functions';
+import { BuiltInFunction } from '../models/BuiltInFunction';
 
 @Injectable({ providedIn: 'root' })
 export class FormulaEngineService {
@@ -54,6 +55,9 @@ export class FormulaEngineService {
     this.setVariable('FALSE', false);
     this.setVariable('NULL', null);
   }
+  registerFunction(name: string, fn: BuiltInFunction): void {
+    BUILT_IN_FUNCTIONS[name] = fn;
+  }
 
   // ═══════════════════════════════════════════════════════════
   // FORMULA MANAGEMENT
@@ -66,7 +70,7 @@ export class FormulaEngineService {
     const { tokens, errors: lexerErrors } = this.lexer.tokenize(expression);
 
     if (lexerErrors.length > 0) {
-      const errorMsg = lexerErrors.map(e => e.message).join('; ');
+      const errorMsg = lexerErrors.map((e) => e.message).join('; ');
       this.updateError(id, errorMsg);
       return { id, expression, isValid: false, error: errorMsg, dependencies: new Set() };
     }
@@ -75,7 +79,7 @@ export class FormulaEngineService {
     const { ast, errors: parserErrors } = this.parser.parse(tokens);
 
     if (parserErrors.length > 0 || !ast) {
-      const errorMsg = parserErrors.map(e => e.message).join('; ');
+      const errorMsg = parserErrors.map((e) => e.message).join('; ');
       this.updateError(id, errorMsg);
       return { id, expression, isValid: false, error: errorMsg, dependencies: new Set() };
     }
@@ -99,7 +103,7 @@ export class FormulaEngineService {
     };
 
     // Update formulas map
-    this._formulas.update(map => {
+    this._formulas.update((map) => {
       const newMap = new Map(map);
       newMap.set(id, formula);
       return newMap;
@@ -112,7 +116,7 @@ export class FormulaEngineService {
     for (const dep of dependencies) {
       if (dep.startsWith('[%') && dep.endsWith('%]')) {
         const varName = dep.slice(2, -2);
-        this._variables.update(map => {
+        this._variables.update((map) => {
           const newMap = new Map(map);
           const existing = newMap.get(varName);
           newMap.set(varName, {
@@ -195,7 +199,7 @@ export class FormulaEngineService {
   // ═══════════════════════════════════════════════════════════
 
   setVariable(name: string, value: FormulaValue): void {
-    this._variables.update(map => {
+    this._variables.update((map) => {
       const newMap = new Map(map);
       const existing = newMap.get(name);
       newMap.set(name, {
@@ -212,7 +216,7 @@ export class FormulaEngineService {
   }
 
   deleteVariable(name: string): void {
-    this._variables.update(map => {
+    this._variables.update((map) => {
       const newMap = new Map(map);
       newMap.delete(name);
       return newMap;
@@ -223,27 +227,26 @@ export class FormulaEngineService {
   // ENTITY MANAGEMENT
   // ═══════════════════════════════════════════════════════════
 
+  /**
+   * add or update entity
+   * @param id Entity Id
+   * @param data data
+   */
   setEntity(id: string, data: Entity): void {
-    this._entities.update(map => {
+    this._entities.update((map) => {
       const newMap = new Map(map);
-      newMap.set(id, { ...data });
+      const existingEntity = newMap.get(id);
+      newMap.set(id, {
+        ...existingEntity, // دیتای قبلی (اگر وجود داشته باشد)
+        ...data, // دیتای جدید (فیلدهای جدید یا آپدیت‌شده)
+      });
+
       return newMap;
     });
   }
 
   getEntity(id: string): Entity | undefined {
     return this._entities().get(id);
-  }
-
-  updateEntityField(entityId: string, field: string, value: any): void {
-    this._entities.update(map => {
-      const newMap = new Map(map);
-      const entity = newMap.get(entityId);
-      if (entity) {
-        newMap.set(entityId, { ...entity, [field]: value });
-      }
-      return newMap;
-    });
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -259,7 +262,7 @@ export class FormulaEngineService {
       if (lexerErrors.length > 0) {
         return {
           success: false,
-          error: lexerErrors.map(e => e.message).join('; '),
+          error: lexerErrors.map((e) => e.message).join('; '),
           executionTime: performance.now() - startTime,
         };
       }
@@ -269,7 +272,7 @@ export class FormulaEngineService {
       if (parserErrors.length > 0 || !ast) {
         return {
           success: false,
-          error: parserErrors.map(e => e.message).join('; '),
+          error: parserErrors.map((e) => e.message).join('; '),
           executionTime: performance.now() - startTime,
         };
       }
@@ -398,7 +401,7 @@ export class FormulaEngineService {
   }
 
   private updateError(id: string, error: string): void {
-    this._errors.update(map => {
+    this._errors.update((map) => {
       const newMap = new Map(map);
       newMap.set(id, error);
       return newMap;
@@ -406,7 +409,7 @@ export class FormulaEngineService {
   }
 
   private clearError(id: string): void {
-    this._errors.update(map => {
+    this._errors.update((map) => {
       const newMap = new Map(map);
       newMap.delete(id);
       return newMap;
@@ -422,12 +425,12 @@ export class FormulaEngineService {
   validateExpression(expression: string): { valid: boolean; errors: string[] } {
     const { tokens, errors: lexerErrors } = this.lexer.tokenize(expression);
     if (lexerErrors.length > 0) {
-      return { valid: false, errors: lexerErrors.map(e => e.message) };
+      return { valid: false, errors: lexerErrors.map((e) => e.message) };
     }
 
     const { ast, errors: parserErrors } = this.parser.parse(tokens);
     if (parserErrors.length > 0 || !ast) {
-      return { valid: false, errors: parserErrors.map(e => e.message) };
+      return { valid: false, errors: parserErrors.map((e) => e.message) };
     }
 
     return { valid: true, errors: [] };

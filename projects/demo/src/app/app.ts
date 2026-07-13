@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { EvaluationResult, FormulaEngineService } from 'exp-parser';
+import { EvaluationResult, FormulaEngineService } from 'ngx-exp-parser';
 
 @Component({
   selector: 'app-root',

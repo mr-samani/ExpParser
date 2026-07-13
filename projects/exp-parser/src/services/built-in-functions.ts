@@ -1,7 +1,6 @@
 // built-in-functions.ts
 import { FormulaValue } from '../models/ast.model';
-
-export type BuiltInFunction = (args: FormulaValue[]) => FormulaValue;
+import { BuiltInFunction } from '../models/BuiltInFunction';
 
 export const BUILT_IN_FUNCTIONS: Record<string, BuiltInFunction> = {
   // Math functions

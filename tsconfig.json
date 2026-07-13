@@ -4,7 +4,7 @@
   "compileOnSave": false,
   "compilerOptions": {
     "paths": {
-      "exp-parser": ["./projects/exp-parser/src/index.ts"]
+      "ngx-exp-parser": ["./projects/exp-parser/src/index.ts"]
     },
     "strict": true,
     "noImplicitOverride": true,

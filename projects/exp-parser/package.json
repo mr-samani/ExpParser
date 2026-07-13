@@ -1,6 +1,15 @@
 {
-  "name": "exp-parser",
-  "version": "0.0.1",
+  "name": "ngx-exp-parser",
+  "description": "Angular expression parser and avaluator",
+  "version": "0.0.2",
+  "author": "Mohammadreza Samani <mr.samani1368@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mr-samani/exp-parser.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mr-samani/exp-parser/issues"
+  },
   "peerDependencies": {
     "@angular/common": ">=21.0.0",
     "@angular/core": ">=21.0.0"
@@ -8,5 +17,13 @@
   "dependencies": {
     "tslib": "^2.3.0"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "keywords": [
+    "Angular",
+    "Expression",
+    "Expression-parser",
+    "Expression-evaluator",
+    "parser",
+    "evaluate"
+  ]
 }
