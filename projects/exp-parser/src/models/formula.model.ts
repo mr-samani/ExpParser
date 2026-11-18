@@ -1,5 +1,4 @@
-// formula.model.ts
-import { ASTNode, FormulaValue } from './ast.model';
+import { ASTNode, ExpressionValue, FormulaValue } from './ast.model';
 
 export interface FormulaDefinition {
   id: string;
@@ -25,11 +24,13 @@ export interface EvaluationContext {
   variables: Map<string, Variable>;
   entities: Map<string, Entity>;
   functions: Map<string, Function>;
+  /** Optional root object used to resolve normal expressions such as form.name. */
+  scope?: object;
 }
 
 export interface EvaluationResult {
   success: boolean;
-  value?: FormulaValue;
+  value?: ExpressionValue;
   error?: string;
   executionTime: number;
 }
