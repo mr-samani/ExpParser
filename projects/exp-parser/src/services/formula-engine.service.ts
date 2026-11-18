@@ -73,6 +73,12 @@ export class FormulaEngineService {
     return value && typeof value === 'object' ? (this.rawByProxy.get(value) ?? value) : value;
   }
 
+  private isReactiveContainer(value: object): boolean {
+    if (Array.isArray(value)) return true;
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+  }
+
   private versionFor(target: object, key: PropertyKey): WritableSignal<number> {
     let versions = this.propertyVersions.get(target);
     if (!versions) {
@@ -93,7 +99,7 @@ export class FormulaEngineService {
 
   private toReactive<T extends object>(input: T): T {
     const raw = this.toRaw(input);
-    if (!raw || typeof raw !== 'object') return input;
+    if (!raw || typeof raw !== 'object' || !this.isReactiveContainer(raw)) return input;
     const cached = this.proxyCache.get(raw);
     if (cached) return cached as T;
 
