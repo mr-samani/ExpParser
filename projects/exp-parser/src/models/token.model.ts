@@ -20,6 +20,8 @@ export enum TokenType {
   // Comparison
   EQ = 'EQ',
   NEQ = 'NEQ',
+  STRICT_EQ = 'STRICT_EQ',
+  STRICT_NEQ = 'STRICT_NEQ',
   LT = 'LT',
   GT = 'GT',
   LTE = 'LTE',
@@ -57,6 +59,8 @@ export const OPERATOR_PRECEDENCE: Record<TokenType, number> = {
   [TokenType.AND]: 2,
   [TokenType.EQ]: 3,
   [TokenType.NEQ]: 3,
+  [TokenType.STRICT_EQ]: 3,
+  [TokenType.STRICT_NEQ]: 3,
   [TokenType.LT]: 4,
   [TokenType.GT]: 4,
   [TokenType.LTE]: 4,
