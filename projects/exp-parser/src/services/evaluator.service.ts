@@ -45,7 +45,7 @@ export class EvaluatorService {
 
   private evaluateVariableReference(node: VariableReference): FormulaValue {
     const variable = this.context.variables.get(node.name);
-    if (!variable) throw new Error(`Undefined variable: ${key}`);
+    if (!variable) throw new Error(`Undefined variable: [%${node.name}%]`);
     return variable.value;
   }
 
@@ -96,6 +96,8 @@ export class EvaluatorService {
       case TokenType.POWER: return this.power(left as FormulaValue, right as FormulaValue);
       case TokenType.EQ: return this.equals(left as FormulaValue, right as FormulaValue);
       case TokenType.NEQ: return !this.equals(left as FormulaValue, right as FormulaValue);
+      case TokenType.STRICT_EQ: return left === right;
+      case TokenType.STRICT_NEQ: return left !== right;
       case TokenType.LT: return this.lessThan(left as FormulaValue, right as FormulaValue);
       case TokenType.GT: return this.greaterThan(left as FormulaValue, right as FormulaValue);
       case TokenType.LTE: return this.equals(left as FormulaValue, right as FormulaValue) || this.lessThan(left as FormulaValue, right as FormulaValue);
