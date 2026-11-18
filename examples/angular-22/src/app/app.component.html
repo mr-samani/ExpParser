@@ -1,0 +1,129 @@
+<main class="page">
+  <header class="hero">
+    <span class="eyebrow">NGX EXP PARSER · ANGULAR 22</span>
+    <h1>Reactive expressions</h1>
+    <p>
+      Bind controls directly to your model. Expressions react to nested changes
+      without registering variables or synchronizing form state with the engine.
+    </p>
+  </header>
+
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <span class="step">01 / DISPLAY CONDITION</span>
+        <h2>Two checkboxes, one expression</h2>
+      </div>
+      <code>{{ expression }}</code>
+    </div>
+
+    <div class="controls">
+      <label class="check-row">
+        <input type="checkbox" name="x1a1" [(ngModel)]="form.x1.a1">
+        <span class="check-copy">
+          <strong>x1.a1</strong>
+          <small>First condition</small>
+        </span>
+        <span class="value" [class.active]="form.x1.a1">{{ form.x1.a1 }}</span>
+      </label>
+
+      <label class="check-row">
+        <input type="checkbox" name="x2a3" [(ngModel)]="form.x2.a3">
+        <span class="check-copy">
+          <strong>x2.a3</strong>
+          <small>Second condition</small>
+        </span>
+        <span class="value" [class.active]="form.x2.a3">{{ form.x2.a3 }}</span>
+      </label>
+    </div>
+
+    @if (condition()) {
+      <div class="result success">
+        <span class="result-icon">✓</span>
+        <div>
+          <strong>Element is visible</strong>
+          <p>Both fields are true. The @if block is currently rendered.</p>
+        </div>
+      </div>
+    } @else {
+      <div class="result muted">
+        <span class="result-icon">×</span>
+        <div>
+          <strong>Element is hidden</strong>
+          <p>Turn on both checkboxes to satisfy the expression.</p>
+        </div>
+      </div>
+    }
+  </section>
+
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <span class="step">02 / NESTED MODEL</span>
+        <h2>More than simple booleans</h2>
+      </div>
+      <span class="tag">customer.isVip && customer.age >= 18</span>
+    </div>
+
+    <div class="controls two-columns">
+      <label class="check-row">
+        <input type="checkbox" name="vip" [(ngModel)]="form.customer.isVip">
+        <span class="check-copy">
+          <strong>VIP customer</strong>
+          <small>customer.isVip</small>
+        </span>
+        <span class="value" [class.active]="form.customer.isVip">{{ form.customer.isVip }}</span>
+      </label>
+
+      <label class="field-row">
+        <span>
+          <strong>Customer age</strong>
+          <small>customer.age</small>
+        </span>
+        <input type="number" name="age" [(ngModel)]="form.customer.age" min="0">
+      </label>
+    </div>
+
+    <div class="inline-result" [class.active]="vipDiscount()">
+      {{ vipDiscount() ? 'VIP discount applies' : 'No VIP discount' }}
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <span class="step">03 / ARRAY ACCESS</span>
+        <h2>Reactive array items</h2>
+      </div>
+      <code>lines[0].enabled && lines[0].quantity > 0</code>
+    </div>
+
+    <div class="controls two-columns">
+      <label class="check-row">
+        <input type="checkbox" name="lineEnabled" [(ngModel)]="form.lines[0].enabled">
+        <span class="check-copy">
+          <strong>First line enabled</strong>
+          <small>lines[0].enabled</small>
+        </span>
+        <span class="value" [class.active]="form.lines[0].enabled">{{ form.lines[0].enabled }}</span>
+      </label>
+
+      <label class="field-row">
+        <span>
+          <strong>Quantity</strong>
+          <small>lines[0].quantity</small>
+        </span>
+        <input type="number" name="quantity" [(ngModel)]="form.lines[0].quantity" min="0">
+      </label>
+    </div>
+
+    <div class="inline-result" [class.active]="hasEnabledQuantity()">
+      {{ hasEnabledQuantity() ? 'Line contributes to the order' : 'Line is ignored' }}
+    </div>
+  </section>
+
+  <footer>
+    <span>One reactive model · Per-property tracking · Cached AST</span>
+    <span>No manual update calls</span>
+  </footer>
+</main>
