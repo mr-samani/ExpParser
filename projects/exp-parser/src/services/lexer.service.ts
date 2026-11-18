@@ -153,7 +153,7 @@ export class LexerService {
     if (three === '===' || three === '!==') {
       this.position += 3;
       this.tokens.push({
-        type: three === '===' ? TokenType.EQ : TokenType.NEQ,
+        type: three === '===' ? TokenType.STRICT_EQ : TokenType.STRICT_NEQ,
         value: three, position: start, length: 3,
       });
       return true;
