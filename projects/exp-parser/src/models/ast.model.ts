@@ -1,4 +1,3 @@
-// ast.model.ts
 import { TokenType } from './token.model';
 
 export type ASTNodeType =
@@ -12,6 +11,7 @@ export type ASTNodeType =
   | 'BinaryExpression'
   | 'UnaryExpression'
   | 'FunctionCall'
+  | 'MemberExpression'
   | 'ArrayAccess';
 
 export interface ASTNode {
@@ -73,4 +73,19 @@ export interface FunctionCall extends ASTNode {
   arguments: ASTNode[];
 }
 
+export interface MemberExpression extends ASTNode {
+  type: 'MemberExpression';
+  object: ASTNode;
+  property: string;
+}
+
+export interface ArrayAccess extends ASTNode {
+  type: 'ArrayAccess';
+  object: ASTNode;
+  index: ASTNode;
+}
+
 export type FormulaValue = number | string | boolean | null;
+
+/** Values that can be read from a reactive model or returned by an expression. */
+export type ExpressionValue = FormulaValue | object | undefined;

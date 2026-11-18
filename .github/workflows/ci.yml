@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, feat/reactive-model-expressions]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.17.0
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Build ngx-exp-parser
+        run: npm run build:lib
+
+      - name: Run library unit tests
+        run: npx ng test exp-parser --watch=false
+
+      - name: Install Angular 22 example dependencies
+        run: npm install
+        working-directory: examples/angular-22
+
+      - name: Build Angular 22 example
+        run: npm run build
+        working-directory: examples/angular-22

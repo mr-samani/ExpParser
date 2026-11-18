@@ -1,6 +1,6 @@
 {
   "name": "ngx-exp-parser",
-  "description": "Angular expression parser and avaluator",
+  "description": "Angular expression parser and evaluator",
   "version": "0.0.2",
   "author": "Mohammadreza Samani <mr.samani1368@gmail.com>",
   "repository": {
