@@ -1,15 +1,14 @@
-// token.model.ts
 export enum TokenType {
   NUMBER = 'NUMBER',
   STRING = 'STRING',
   BOOLEAN = 'BOOLEAN',
   NULL = 'NULL',
-  
+
   // Identifiers & Variables
   IDENTIFIER = 'IDENTIFIER',
-  VARIABLE_REF = 'VARIABLE_REF',      // [%myvar%]
-  ENTITY_REF = 'ENTITY_REF',          // @Q123ewr.A3tffdd
-  
+  VARIABLE_REF = 'VARIABLE_REF',
+  ENTITY_REF = 'ENTITY_REF',
+
   // Operators
   PLUS = 'PLUS',
   MINUS = 'MINUS',
@@ -17,7 +16,7 @@ export enum TokenType {
   DIVIDE = 'DIVIDE',
   MODULO = 'MODULO',
   POWER = 'POWER',
-  
+
   // Comparison
   EQ = 'EQ',
   NEQ = 'NEQ',
@@ -25,22 +24,23 @@ export enum TokenType {
   GT = 'GT',
   LTE = 'LTE',
   GTE = 'GTE',
-  
+
   // Logical
   AND = 'AND',
   OR = 'OR',
   NOT = 'NOT',
-  
-  // Grouping
+
+  // Grouping and member access
   LPAREN = 'LPAREN',
   RPAREN = 'RPAREN',
   LBRACKET = 'LBRACKET',
   RBRACKET = 'RBRACKET',
-  
+  DOT = 'DOT',
+
   // Functions
   COMMA = 'COMMA',
   FUNCTION = 'FUNCTION',
-  
+
   // Special
   EOF = 'EOF',
 }
@@ -79,7 +79,8 @@ export const OPERATOR_PRECEDENCE: Record<TokenType, number> = {
   [TokenType.RPAREN]: 0,
   [TokenType.LBRACKET]: 0,
   [TokenType.RBRACKET]: 0,
+  [TokenType.DOT]: 0,
   [TokenType.COMMA]: 0,
   [TokenType.FUNCTION]: 0,
-  [TokenType.EOF]: 0
+  [TokenType.EOF]: 0,
 };
