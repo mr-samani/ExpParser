@@ -163,6 +163,23 @@ export class FormulaEngineService {
     const formula: FormulaDefinition = { id, expression, ast: parsed.ast, dependencies, isValid: true };
     this._formulas.update(map => new Map(map).set(id, formula));
     this.clearError(id);
+
+    // Keep the legacy formula/variable metadata in sync for the original API.
+    for (const dependency of dependencies) {
+      if (dependency.startsWith('[%') && dependency.endsWith('%]')) {
+        const variableName = dependency.slice(2, -2);
+        this._variables.update(map => {
+          const next = new Map(map);
+          const existing = next.get(variableName);
+          next.set(variableName, {
+            name: variableName,
+            value: existing?.value ?? null,
+            formulaId: existing?.formulaId ? `${existing.formulaId},${id}` : id,
+          });
+          return next;
+        });
+      }
+    }
     return formula;
   }
 
