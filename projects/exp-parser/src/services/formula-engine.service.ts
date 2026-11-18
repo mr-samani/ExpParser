@@ -1,4 +1,4 @@
-import { Injectable, computed, signal, WritableSignal } from '@angular/core';
+import { Injectable, computed, signal, untracked, WritableSignal } from '@angular/core';
 import { LexerService } from './lexer.service';
 import { ParserService } from './parser.service';
 import { EvaluatorService } from './evaluator.service';
@@ -108,8 +108,15 @@ export class FormulaEngineService {
         if (success && !Object.is(previous, rawValue)) {
           engine.notify(target, key);
           if (!hadKey) engine.notify(target, ITERATE_KEY);
-          if (Array.isArray(target) && key !== 'length' && isArrayIndex(key) && Number(key) >= oldLength) {
-            engine.notify(target, 'length');
+          if (Array.isArray(target)) {
+            if (key === 'length' && typeof rawValue === 'number' && rawValue < oldLength) {
+              for (const existingKey of Reflect.ownKeys(target)) {
+                if (isArrayIndex(existingKey) && Number(existingKey) >= rawValue) engine.notify(target, existingKey);
+              }
+              engine.notify(target, ITERATE_KEY);
+            } else if (key !== 'length' && isArrayIndex(key) && Number(key) >= oldLength) {
+              engine.notify(target, 'length');
+            }
           }
         }
         return success;
@@ -171,7 +178,7 @@ export class FormulaEngineService {
       if (!formula?.isValid || !formula.ast) {
         return { success: false, error: formula?.error ?? `Formula not found: ${id}`, executionTime: performance.now() - startTime };
       }
-      const context = this.buildEvaluationContext();
+      const context = this.buildEvaluationContext(formula.ast);
       const sortedIds = this.topologicalSort([id]);
       for (const evalId of sortedIds) {
         const item = this._formulas().get(evalId);
@@ -202,7 +209,7 @@ export class FormulaEngineService {
   eval(expression: string, scope?: object): ExpressionValue {
     const parsed = this.getAst(expression);
     if (!parsed.ast) throw new Error(parsed.error ?? 'Invalid expression');
-    this.evaluator.setContext({ ...this.buildEvaluationContext(), scope });
+    this.evaluator.setContext({ ...this.buildEvaluationContext(parsed.ast), scope });
     return this.evaluator.evaluate(parsed.ast);
   }
 
@@ -227,8 +234,12 @@ export class FormulaEngineService {
     return { ast };
   }
 
-  private buildEvaluationContext(): EvaluationContext {
-    return { variables: new Map(this._variables()), entities: new Map(this._entities()), functions: new Map() };
+  private buildEvaluationContext(ast?: ASTNode): EvaluationContext {
+    const readsVariables = ast ? containsNode(ast, 'VariableReference') : true;
+    const readsEntities = ast ? containsNode(ast, 'EntityReference') : true;
+    const variables = readsVariables ? this._variables() : untracked(() => this._variables());
+    const entities = readsEntities ? this._entities() : untracked(() => this._entities());
+    return { variables: new Map(variables), entities: new Map(entities), functions: new Map() };
   }
 
   private extractDependencies(ast: ASTNode): Set<string> {
@@ -298,4 +309,23 @@ export class FormulaEngineService {
 
 function isArrayIndex(key: PropertyKey): boolean {
   return typeof key === 'string' && /^(0|[1-9]\d*)$/.test(key);
+}
+
+
+function containsNode(node: ASTNode, type: ASTNode['type']): boolean {
+  if (node.type === type) return true;
+  switch (node.type) {
+    case 'BinaryExpression':
+      return containsNode(node.left, type) || containsNode(node.right, type);
+    case 'UnaryExpression':
+      return containsNode(node.operand, type);
+    case 'FunctionCall':
+      return node.arguments.some(argument => containsNode(argument, type));
+    case 'MemberExpression':
+      return containsNode(node.object, type);
+    case 'ArrayAccess':
+      return containsNode(node.object, type) || containsNode(node.index, type);
+    default:
+      return false;
+  }
 }
