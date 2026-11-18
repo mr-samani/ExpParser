@@ -152,7 +152,3 @@ npm install
 npm run build:lib
 npm test
 ```
-
-## License
-
-MIT
