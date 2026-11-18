@@ -308,18 +308,19 @@ function isArrayIndex(key: PropertyKey): boolean {
 
 
 function containsNode(node: ASTNode, type: ASTNode['type']): boolean {
-  if (node.type === type) return true;
-  switch (node.type) {
+  const current = node as any;
+  if (current.type === type) return true;
+  switch (current.type) {
     case 'BinaryExpression':
-      return containsNode(node.left, type) || containsNode(node.right, type);
+      return containsNode(current.left, type) || containsNode(current.right, type);
     case 'UnaryExpression':
-      return containsNode(node.operand, type);
+      return containsNode(current.operand, type);
     case 'FunctionCall':
-      return node.arguments.some(argument => containsNode(argument, type));
+      return current.arguments.some((argument: ASTNode) => containsNode(argument, type));
     case 'MemberExpression':
-      return containsNode(node.object, type);
+      return containsNode(current.object, type);
     case 'ArrayAccess':
-      return containsNode(node.object, type) || containsNode(node.index, type);
+      return containsNode(current.object, type) || containsNode(current.index, type);
     default:
       return false;
   }
