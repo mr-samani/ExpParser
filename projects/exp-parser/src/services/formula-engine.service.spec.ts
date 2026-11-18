@@ -91,4 +91,11 @@ describe('FormulaEngineService reactive expressions', () => {
     expect(engine.validateExpression('x1.').valid).toBe(false);
     expect(() => engine.eval('x1.')).toThrow();
   });
+  it('distinguishes loose and strict equality operators', () => {
+    const engine = createEngine();
+    expect(engine.eval("1 == '1'")).toBe(true);
+    expect(engine.eval("1 === '1'")).toBe(false);
+    expect(engine.eval("1 !== '1'")).toBe(true);
+  });
+
 });
