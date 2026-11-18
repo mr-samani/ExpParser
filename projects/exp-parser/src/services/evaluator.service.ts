@@ -12,11 +12,8 @@ const BLOCKED_PROPERTIES = new Set(['__proto__', 'prototype', 'constructor']);
 @Injectable({ providedIn: 'root' })
 export class EvaluatorService {
   private context!: EvaluationContext;
-  private evaluationStack = new Set<string>();
-
   setContext(context: EvaluationContext): void {
     this.context = context;
-    this.evaluationStack.clear();
   }
 
   evaluate(node: ASTNode): ExpressionValue {
@@ -47,8 +44,6 @@ export class EvaluatorService {
   }
 
   private evaluateVariableReference(node: VariableReference): FormulaValue {
-    const key = `[%${node.name}%]`;
-    if (this.evaluationStack.has(key)) throw new Error(`Circular reference detected for variable: ${key}`);
     const variable = this.context.variables.get(node.name);
     if (!variable) throw new Error(`Undefined variable: ${key}`);
     return variable.value;
