@@ -1,4 +1,4 @@
-import { Injectable, computed, signal, untracked, WritableSignal } from '@angular/core';
+import { Injectable, computed, signal, WritableSignal } from '@angular/core';
 import { LexerService } from './lexer.service';
 import { ParserService } from './parser.service';
 import { EvaluatorService } from './evaluator.service';
@@ -10,7 +10,6 @@ import { BUILT_IN_FUNCTIONS, getAllFunctionNames } from './built-in-functions';
 import { BuiltInFunction } from '../models/BuiltInFunction';
 
 const ITERATE_KEY = Symbol('iterate');
-const blockedKeys = new Set<PropertyKey>(['__proto__', 'prototype', 'constructor']);
 
 @Injectable({ providedIn: 'root' })
 export class FormulaEngineService {
@@ -36,7 +35,6 @@ export class FormulaEngineService {
   private readonly propertyVersions = new WeakMap<object, Map<PropertyKey, WritableSignal<number>>>();
   private readonly proxyCache = new WeakMap<object, object>();
   private readonly rawByProxy = new WeakMap<object, object>();
-  private readonly trackedTargets = new WeakSet<object>();
 
   constructor(
     private lexer: LexerService,
@@ -109,10 +107,8 @@ export class FormulaEngineService {
           engine.notify(target, key);
           if (!hadKey) engine.notify(target, ITERATE_KEY);
           if (Array.isArray(target)) {
-            if (key === 'length' && typeof rawValue === 'number' && rawValue < oldLength) {
-              for (const existingKey of Reflect.ownKeys(target)) {
-                if (isArrayIndex(existingKey) && Number(existingKey) >= rawValue) engine.notify(target, existingKey);
-              }
+            if (key === 'length' && target.length < oldLength) {
+              for (let index = target.length; index < oldLength; index++) engine.notify(target, String(index));
               engine.notify(target, ITERATE_KEY);
             } else if (key !== 'length' && isArrayIndex(key) && Number(key) >= oldLength) {
               engine.notify(target, 'length');
@@ -163,7 +159,6 @@ export class FormulaEngineService {
       return { id, expression, isValid: false, error, dependencies: new Set() };
     }
     const dependencies = this.extractDependencies(parsed.ast);
-    this.astCache.set(id, parsed.ast);
     this.updateDependencyGraph(id, dependencies);
     const formula: FormulaDefinition = { id, expression, ast: parsed.ast, dependencies, isValid: true };
     this._formulas.update(map => new Map(map).set(id, formula));
@@ -235,10 +230,10 @@ export class FormulaEngineService {
   }
 
   private buildEvaluationContext(ast?: ASTNode): EvaluationContext {
-    const readsVariables = ast ? containsNode(ast, 'VariableReference') : true;
-    const readsEntities = ast ? containsNode(ast, 'EntityReference') : true;
-    const variables = readsVariables ? this._variables() : untracked(() => this._variables());
-    const entities = readsEntities ? this._entities() : untracked(() => this._entities());
+    // Do not subscribe a normal form expression to the engine's global variable/entity maps.
+    // Explicit legacy references opt into those stores.
+    const variables = ast && containsNode(ast, 'VariableReference') ? this._variables() : new Map<string, Variable>();
+    const entities = ast && containsNode(ast, 'EntityReference') ? this._entities() : new Map<string, Entity>();
     return { variables: new Map(variables), entities: new Map(entities), functions: new Map() };
   }
 
