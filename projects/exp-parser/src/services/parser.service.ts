@@ -1,18 +1,9 @@
-// parser.service.ts
 import { Injectable } from '@angular/core';
-import { Token, TokenType, OPERATOR_PRECEDENCE } from '../models/token.model';
+import { Token, TokenType } from '../models/token.model';
 import {
-  ASTNode,
-  NumberLiteral,
-  StringLiteral,
-  BooleanLiteral,
-  NullLiteral,
-  Identifier,
-  VariableReference,
-  EntityReference,
-  BinaryExpression,
-  UnaryExpression,
-  FunctionCall,
+  ASTNode, NumberLiteral, StringLiteral, BooleanLiteral, NullLiteral, Identifier,
+  VariableReference, EntityReference, BinaryExpression, UnaryExpression, FunctionCall,
+  MemberExpression, ArrayAccess,
 } from '../models/ast.model';
 
 export interface ParseError {
@@ -24,22 +15,24 @@ export interface ParseError {
 @Injectable({ providedIn: 'root' })
 export class ParserService {
   private tokens: Token[] = [];
-  private position: number = 0;
+  private position = 0;
   private errors: ParseError[] = [];
 
   parse(tokens: Token[]): { ast: ASTNode | null; errors: ParseError[] } {
     this.tokens = tokens.filter(t => t.type !== TokenType.EOF);
     this.position = 0;
     this.errors = [];
-
     if (this.tokens.length === 0) {
       return { ast: null, errors: [{ message: 'Empty expression', position: 0 }] };
     }
-
     try {
       const ast = this.parseExpression();
-      return { ast, errors: this.errors };
-    } catch (e) {
+      if (this.position < this.tokens.length) {
+        const token = this.current();
+        this.errors.push({ message: `Unexpected token: ${token.value}`, position: token.position });
+      }
+      return { ast: this.errors.length ? null : ast, errors: this.errors };
+    } catch {
       return { ast: null, errors: this.errors };
     }
   }
@@ -47,324 +40,159 @@ export class ParserService {
   private current(): Token {
     return this.tokens[this.position] || { type: TokenType.EOF, value: null, position: 0, length: 0 };
   }
-
-  private peek(offset: number = 0): Token {
+  private peek(offset = 0): Token {
     return this.tokens[this.position + offset] || { type: TokenType.EOF, value: null, position: 0, length: 0 };
   }
-
   private advance(): Token {
     return this.tokens[this.position++] || { type: TokenType.EOF, value: null, position: 0, length: 0 };
   }
-
   private expect(type: TokenType, message?: string): Token {
     const token = this.current();
     if (token.type !== type) {
-      this.errors.push({
-        message: message || `Expected ${type} but got ${token.type}`,
-        position: token.position,
-        expected: type,
-      });
+      this.errors.push({ message: message || `Expected ${type} but got ${token.type}`, position: token.position, expected: type });
+      throw new Error('Unexpected token');
     }
     return this.advance();
   }
+  private match(...types: TokenType[]): boolean { return types.includes(this.current().type); }
 
-  private match(...types: TokenType[]): boolean {
-    return types.includes(this.current().type);
-  }
+  private parseExpression(): ASTNode { return this.parseOrExpression(); }
 
-  private matchAny(validTokens: TokenType[]): boolean {
-    return validTokens.includes(this.current().type);
-  }
-
-  // Expression = OrExpression
-  private parseExpression(): ASTNode {
-    return this.parseOrExpression();
-  }
-
-  // OrExpression = AndExpression ('||' AndExpression)*
   private parseOrExpression(): ASTNode {
     let left = this.parseAndExpression();
-
-    while (this.match(TokenType.OR)) {
-      const operator = this.advance();
-      const right = this.parseAndExpression();
-      left = this.createBinaryNode(operator, left, right);
-    }
-
+    while (this.match(TokenType.OR)) left = this.binary(this.advance(), left, this.parseAndExpression());
     return left;
   }
-
-  // AndExpression = EqualityExpression ('&&' EqualityExpression)*
   private parseAndExpression(): ASTNode {
     let left = this.parseEqualityExpression();
-
-    while (this.match(TokenType.AND)) {
-      const operator = this.advance();
-      const right = this.parseEqualityExpression();
-      left = this.createBinaryNode(operator, left, right);
-    }
-
+    while (this.match(TokenType.AND)) left = this.binary(this.advance(), left, this.parseEqualityExpression());
     return left;
   }
-
-  // EqualityExpression = ComparisonExpression (('==' | '!=') ComparisonExpression)*
   private parseEqualityExpression(): ASTNode {
     let left = this.parseComparisonExpression();
-
-    while (this.match(TokenType.EQ, TokenType.NEQ)) {
-      const operator = this.advance();
-      const right = this.parseComparisonExpression();
-      left = this.createBinaryNode(operator, left, right);
-    }
-
+    while (this.match(TokenType.EQ, TokenType.NEQ)) left = this.binary(this.advance(), left, this.parseComparisonExpression());
     return left;
   }
-
-  // ComparisonExpression = AdditionExpression (('<' | '>' | '<=' | '>=') AdditionExpression)*
   private parseComparisonExpression(): ASTNode {
     let left = this.parseAdditionExpression();
-
     while (this.match(TokenType.LT, TokenType.GT, TokenType.LTE, TokenType.GTE)) {
-      const operator = this.advance();
-      const right = this.parseAdditionExpression();
-      left = this.createBinaryNode(operator, left, right);
+      left = this.binary(this.advance(), left, this.parseAdditionExpression());
     }
-
     return left;
   }
-
-  // AdditionExpression = MultiplicationExpression (('+' | '-') MultiplicationExpression)*
   private parseAdditionExpression(): ASTNode {
     let left = this.parseMultiplicationExpression();
-
-    while (this.match(TokenType.PLUS, TokenType.MINUS)) {
-      const operator = this.advance();
-      const right = this.parseMultiplicationExpression();
-      left = this.createBinaryNode(operator, left, right);
-    }
-
+    while (this.match(TokenType.PLUS, TokenType.MINUS)) left = this.binary(this.advance(), left, this.parseMultiplicationExpression());
     return left;
   }
-
-  // MultiplicationExpression = PowerExpression (('*' | '/' | '%') PowerExpression)*
   private parseMultiplicationExpression(): ASTNode {
     let left = this.parsePowerExpression();
-
     while (this.match(TokenType.MULTIPLY, TokenType.DIVIDE, TokenType.MODULO)) {
-      const operator = this.advance();
-      const right = this.parsePowerExpression();
-      left = this.createBinaryNode(operator, left, right);
+      left = this.binary(this.advance(), left, this.parsePowerExpression());
     }
-
     return left;
   }
-
-  // PowerExpression = UnaryExpression ('**' UnaryExpression)* (right associative)
   private parsePowerExpression(): ASTNode {
     let left = this.parseUnaryExpression();
-
-    while (this.match(TokenType.POWER)) {
-      const operator = this.advance();
-      const right = this.parseUnaryExpression();
-      left = this.createBinaryNode(operator, left, right);
-    }
-
+    if (this.match(TokenType.POWER)) left = this.binary(this.advance(), left, this.parsePowerExpression());
     return left;
   }
-
-  // UnaryExpression = ('!' | '-') UnaryExpression | CallExpression
   private parseUnaryExpression(): ASTNode {
-    if (this.match(TokenType.NOT)) {
+    if (this.match(TokenType.NOT, TokenType.MINUS)) {
       const operator = this.advance();
-      const operand = this.parseUnaryExpression();
-      return this.createUnaryNode(operator, operand);
+      return { type: 'UnaryExpression', operator: operator.type, operand: this.parseUnaryExpression(), token: operator } as UnaryExpression;
     }
-
-    if (this.match(TokenType.MINUS)) {
-      const operator = this.advance();
-      const operand = this.parseUnaryExpression();
-      return this.createUnaryNode({ ...operator, type: TokenType.MINUS }, operand);
-    }
-
-    return this.parseCallExpression();
+    return this.parsePostfixExpression();
   }
 
-  // CallExpression = PrimaryExpression | FunctionCall
-  private parseCallExpression(): ASTNode {
-    const primary = this.parsePrimaryExpression();
+  private parsePostfixExpression(): ASTNode {
+    let expression = this.parsePrimaryExpression();
 
-    // Check if it's a function call
-    if (this.match(TokenType.LPAREN)) {
-      if (primary.type !== 'Identifier') {
-        this.errors.push({
-          message: 'Function call must be on an identifier',
-          position: primary.token?.position || 0,
-        });
+    // Whitespace before '(' is allowed: "ABS (value)".
+    if (expression.type === 'Identifier' && this.match(TokenType.LPAREN)) {
+      expression = this.parseNamedFunction(expression as Identifier);
+    }
+
+    while (true) {
+      if (this.match(TokenType.DOT)) {
+        const dot = this.advance();
+        const property = this.expect(TokenType.IDENTIFIER, 'Expected a property name after "."');
+        expression = {
+          type: 'MemberExpression', object: expression, property: String(property.value), token: dot,
+        } as MemberExpression;
+        continue;
       }
+      if (this.match(TokenType.LBRACKET)) {
+        const bracket = this.advance();
+        const index = this.parseExpression();
+        this.expect(TokenType.RBRACKET, 'Expected "]" after index');
+        expression = { type: 'ArrayAccess', object: expression, index, token: bracket } as ArrayAccess;
+        continue;
+      }
+      break;
+    }
+    return expression;
+  }
 
-      this.advance(); // consume '('
-      const args: ASTNode[] = [];
-
-      if (!this.match(TokenType.RPAREN)) {
+  private parseNamedFunction(identifier: Identifier): FunctionCall {
+    this.expect(TokenType.LPAREN);
+    const args: ASTNode[] = [];
+    if (!this.match(TokenType.RPAREN)) {
+      args.push(this.parseExpression());
+      while (this.match(TokenType.COMMA)) {
+        this.advance();
         args.push(this.parseExpression());
-        while (this.match(TokenType.COMMA)) {
-          this.advance();
-          args.push(this.parseExpression());
-        }
       }
-
-      this.expect(TokenType.RPAREN, 'Expected ")" after function arguments');
-
-      return {
-        type: 'FunctionCall',
-        name: (primary as Identifier).name,
-        arguments: args,
-        token: primary.token,
-      } as FunctionCall;
     }
-
-    return primary;
+    this.expect(TokenType.RPAREN, 'Expected ")" after function arguments');
+    return { type: 'FunctionCall', name: identifier.name, arguments: args, token: identifier.token };
   }
 
-  // PrimaryExpression = Number | String | Boolean | Null | 
-  //                    VariableRef | EntityRef | Identifier | '(' Expression ')'
   private parsePrimaryExpression(): ASTNode {
     const token = this.current();
-
-    // Number literal
-    if (token.type === TokenType.NUMBER) {
-      this.advance();
-      return {
-        type: 'NumberLiteral',
-        value: token.value as number,
-        token,
-      } as NumberLiteral;
-    }
-
-    // String literal
-    if (token.type === TokenType.STRING) {
-      this.advance();
-      return {
-        type: 'StringLiteral',
-        value: token.value as string,
-        token,
-      } as StringLiteral;
-    }
-
-    // Boolean literal
-    if (token.type === TokenType.BOOLEAN) {
-      this.advance();
-      return {
-        type: 'BooleanLiteral',
-        value: token.value as boolean,
-        token,
-      } as BooleanLiteral;
-    }
-
-    // Null literal
-    if (token.type === TokenType.NULL) {
-      this.advance();
-      return {
-        type: 'NullLiteral',
-        token,
-      } as NullLiteral;
-    }
-
-    // Variable reference: [%myvar%]
-    if (token.type === TokenType.VARIABLE_REF) {
-      this.advance();
-      return {
-        type: 'VariableReference',
-        name: token.value as string,
-        token,
-      } as VariableReference;
-    }
-
-    // Entity reference: @Q123ewr.A3tffdd
-    if (token.type === TokenType.ENTITY_REF) {
-      this.advance();
-      const ref = token.value as { entityId: string; field: string };
-      return {
-        type: 'EntityReference',
-        entityId: ref.entityId,
-        field: ref.field,
-        token,
-      } as EntityReference;
-    }
-
-    // Identifier
-    if (token.type === TokenType.IDENTIFIER) {
-      this.advance();
-      return {
-        type: 'Identifier',
-        name: token.value as string,
-        token,
-      } as Identifier;
-    }
-
-    // Function call
-    if (token.type === TokenType.FUNCTION) {
-      this.advance();
-      const funcName = token.value as string;
-
-      this.expect(TokenType.LPAREN, 'Expected "(" after function name');
-
-      const args: ASTNode[] = [];
-      if (!this.match(TokenType.RPAREN)) {
-        args.push(this.parseExpression());
-        while (this.match(TokenType.COMMA)) {
-          this.advance();
-          args.push(this.parseExpression());
-        }
+    switch (token.type) {
+      case TokenType.NUMBER:
+        this.advance(); return { type: 'NumberLiteral', value: token.value as number, token } as NumberLiteral;
+      case TokenType.STRING:
+        this.advance(); return { type: 'StringLiteral', value: token.value as string, token } as StringLiteral;
+      case TokenType.BOOLEAN:
+        this.advance(); return { type: 'BooleanLiteral', value: token.value as boolean, token } as BooleanLiteral;
+      case TokenType.NULL:
+        this.advance(); return { type: 'NullLiteral', token } as NullLiteral;
+      case TokenType.VARIABLE_REF:
+        this.advance(); return { type: 'VariableReference', name: token.value as string, token } as VariableReference;
+      case TokenType.ENTITY_REF: {
+        this.advance();
+        const ref = token.value as { entityId: string; field: string };
+        return { type: 'EntityReference', entityId: ref.entityId, field: ref.field, token } as EntityReference;
       }
-
-      this.expect(TokenType.RPAREN, 'Expected ")" after function arguments');
-
-      return {
-        type: 'FunctionCall',
-        name: funcName,
-        arguments: args,
-        token,
-      } as FunctionCall;
+      case TokenType.IDENTIFIER:
+        this.advance(); return { type: 'Identifier', name: token.value as string, token } as Identifier;
+      case TokenType.FUNCTION: {
+        this.advance();
+        const name = token.value as string;
+        this.expect(TokenType.LPAREN, 'Expected "(" after function name');
+        const args: ASTNode[] = [];
+        if (!this.match(TokenType.RPAREN)) {
+          args.push(this.parseExpression());
+          while (this.match(TokenType.COMMA)) { this.advance(); args.push(this.parseExpression()); }
+        }
+        this.expect(TokenType.RPAREN, 'Expected ")" after function arguments');
+        return { type: 'FunctionCall', name, arguments: args, token } as FunctionCall;
+      }
+      case TokenType.LPAREN: {
+        this.advance();
+        const expression = this.parseExpression();
+        this.expect(TokenType.RPAREN, 'Expected ")" after expression');
+        return expression;
+      }
+      default:
+        this.errors.push({ message: `Unexpected token: ${token.type} (${token.value})`, position: token.position });
+        throw new Error('Unexpected token');
     }
-
-    // Parenthesized expression
-    if (token.type === TokenType.LPAREN) {
-      this.advance();
-      const expr = this.parseExpression();
-      this.expect(TokenType.RPAREN, 'Expected ")" after expression');
-      return expr;
-    }
-
-    // Unexpected token
-    this.errors.push({
-      message: `Unexpected token: ${token.type} (${token.value})`,
-      position: token.position,
-    });
-    this.advance();
-    return {
-      type: 'NumberLiteral',
-      value: 0,
-      token,
-    } as NumberLiteral;
   }
 
-  private createBinaryNode(operator: Token, left: ASTNode, right: ASTNode): BinaryExpression {
-    return {
-      type: 'BinaryExpression',
-      operator: operator.type,
-      left,
-      right,
-      token: operator,
-    };
-  }
-
-  private createUnaryNode(operator: Token, operand: ASTNode): UnaryExpression {
-    return {
-      type: 'UnaryExpression',
-      operator: operator.type,
-      operand,
-      token: operator,
-    };
+  private binary(operator: Token, left: ASTNode, right: ASTNode): BinaryExpression {
+    return { type: 'BinaryExpression', operator: operator.type, left, right, token: operator };
   }
 }
