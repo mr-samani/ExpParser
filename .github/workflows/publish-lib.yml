@@ -55,7 +55,7 @@ jobs:
             npm publish "./dist/exp-parser" --access public
           fi
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_ExpParser }}
 
       - name: Create git tag (فقط اگر از پوش برنچ main تریگر شده)
         if: steps.check.outputs.changed == 'true' && github.ref_type == 'branch'
