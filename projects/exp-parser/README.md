@@ -93,25 +93,13 @@ Evaluates an expression and returns `success`, `value`, `error`, and `executionT
 
 The existing `registerFormula`, `evaluateFormula`, `setVariable`, `getVariable`, `deleteVariable`, `setEntity`, `getEntity`, `registerFunction`, and `validateExpression` APIs remain available.
 
-## Angular 22 example
 
-A complete standalone Angular 22 example is available in [examples/angular-22](../../examples/angular-22/README.md).
 
-To run it from the repository root:
 
-```bash
-npm install
-npm run build:lib
-cd examples/angular-22
-npm install
-npm start
-```
-
-The example consumes the local library build from `dist/exp-parser`.
 
 ## Compatibility
 
-The library peer dependencies remain `@angular/core >=21.0.0` and `@angular/common >=21.0.0`. The example workspace uses Angular 22.
+The library peer dependencies remain `@angular/core >=21.0.0` and `@angular/common >=21.0.0`. 
 
 ## Security and scope
 

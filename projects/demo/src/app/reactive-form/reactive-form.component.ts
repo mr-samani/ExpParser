@@ -1,16 +1,15 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { Component, computed, inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { FormulaEngineService } from 'ngx-exp-parser';
 
 @Component({
-  selector: 'app-root',
-  standalone: true,
-  imports: [FormsModule],
-  templateUrl: './app.component.html',
-  styleUrl: './app.component.css',
-  changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'app-reactive-form',
+  templateUrl: './reactive-form.component.html',
+  styleUrls: ['./reactive-form.component.scss'],
+  imports: [CommonModule, FormsModule],
 })
-export class AppComponent {
+export class ReactiveFormComponent {
   private readonly engine = inject(FormulaEngineService);
 
   readonly expression = 'x1.a1 && x2.a3';
@@ -32,11 +31,11 @@ export class AppComponent {
   // No effects, subscriptions, setters, or manual engine updates are required.
   readonly condition = computed(() => this.engine.eval(this.expression, this.form) === true);
 
-  readonly vipDiscount = computed(() =>
-    this.engine.eval('customer.isVip && customer.age >= 18', this.form) === true,
+  readonly vipDiscount = computed(
+    () => this.engine.eval('customer.isVip && customer.age >= 18', this.form) === true,
   );
 
-  readonly hasEnabledQuantity = computed(() =>
-    this.engine.eval('lines[0].enabled && lines[0].quantity > 0', this.form) === true,
+  readonly hasEnabledQuantity = computed(
+    () => this.engine.eval('lines[0].enabled && lines[0].quantity > 0', this.form) === true,
   );
 }

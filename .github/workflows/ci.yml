@@ -32,10 +32,7 @@ jobs:
       - name: Run library unit tests
         run: npx ng test exp-parser --watch=false
 
-      - name: Install Angular 22 example dependencies
-        run: npm install
-        working-directory: examples/angular-22
 
-      - name: Build Angular 22 example
-        run: npm run build
-        working-directory: examples/angular-22
+      - name: Build Angular demo
+        run: npm run build:demo
+#        working-directory: examples/angular-22

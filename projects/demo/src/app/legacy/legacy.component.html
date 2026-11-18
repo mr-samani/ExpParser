@@ -1,0 +1,129 @@
+<div class="formula-parser">
+  <h1>🔢 Formula Parser</h1>
+
+  <!-- Expression Input -->
+  <div class="input-section">
+    <label for="expression">Expression:</label>
+    <textarea
+      id="expression"
+      [(ngModel)]="expression"
+      (keydown.enter)="evaluateExpression()"
+      placeholder="Enter formula, e.g.: @Q123ewr.A3tffdd && [%myvar%] || (@Q245fe4.Point > 13) && @Q234.A25rew * 5"
+      rows="3"
+    ></textarea>
+    <button (click)="evaluateExpression()" [disabled]="!expression">Evaluate</button>
+  </div>
+
+  <!-- Result Display -->
+  @if (lastResult()) {
+    <div
+      class="result"
+      [class.success]="lastResult()!.success"
+      [class.error]="!lastResult()!.success"
+    >
+      <h3>Result:</h3>
+      @if (lastResult()!.success) {
+        <pre>{{ lastResult()!.value | json }}</pre>
+      } @else {
+        <pre class="error">{{ lastResult()!.error }}</pre>
+      }
+      <small>Execution time: {{ lastResult()!.executionTime.toFixed(2) }}ms</small>
+    </div>
+  }
+
+  <!-- Variables Section -->
+  <div class="section">
+    <h2>📦 Variables</h2>
+    <div class="variable-input">
+      <input [(ngModel)]="newVarName" placeholder="Variable name" />
+      <input [(ngModel)]="newVarValue" placeholder="Value" type="text" />
+      <button (click)="addVariable()">Add</button>
+    </div>
+    <div class="variable-list">
+      @for (v of variables() | keyvalue; track v.value.name) {
+        <div class="variable-item">
+          <span class="var-name">[%{{ v.value.name }}%]</span>
+          <span class="var-value">{{ v.value | json }}</span>
+          <button class="delete" (click)="removeVariable(v.value.name)">×</button>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- Entities Section -->
+  <div class="section">
+    <h2>🏢 Entities</h2>
+    <div class="entity-input">
+      <input [(ngModel)]="newEntityId" placeholder="Entity ID (e.g., Q123ewr)" />
+      <input [(ngModel)]="newEntityField" placeholder="Field name" />
+      <input [(ngModel)]="newEntityValue" placeholder="Value" />
+      <button (click)="addEntityField()">Add Field</button>
+    </div>
+    <div class="entity-list">
+      @for (entity of entities() | keyvalue; track entity.value.id) {
+        <div class="entity-item">
+          <h4>@{{ entity.value.id }}</h4>
+          <div class="entity-fields">
+            @for (key of getEntityKeys(entity.value); track key) {
+              <span class="field">
+                <span class="field-name">{{ key }}:</span>
+                <span class="field-value">{{ entity.value[key] | json }}</span>
+              </span>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- Formulas Section -->
+  <div class="section">
+    <h2>📝 Formulas</h2>
+    <div class="formula-input">
+      <input [(ngModel)]="newFormulaId" placeholder="Formula ID" />
+      <input [(ngModel)]="newFormulaExpr" placeholder="Expression" />
+      <button (click)="registerFormula()">Register</button>
+    </div>
+    <div class="formula-list">
+      @for (formula of formulas() | keyvalue; track formula.value.id) {
+        <div class="formula-item" [class.invalid]="!formula.value.isValid">
+          <div class="formula-header">
+            <strong>{{ formula.value.id }}</strong>
+            @if (formula.value.isValid) {
+              <button (click)="evaluateFormula(formula.value.id)">Run</button>
+            }
+          </div>
+          <code>{{ formula.value.expression }}</code>
+          @if (formula.value.error) {
+            <span class="error">{{ formula.value.error }}</span>
+          }
+          @if (formula.value.dependencies.size > 0) {
+            <small>Dependencies: {{ getDependencies(formula) }}</small>
+          }
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- Available Functions -->
+  <div class="section">
+    <h2>⚙️ Available Functions</h2>
+    <div class="function-list">
+      @for (fn of availableFunctions(); track fn) {
+        <span class="function-badge">{{ fn }}()</span>
+      }
+    </div>
+  </div>
+
+  <!-- Examples -->
+  <div class="section">
+    <h2>💡 Examples</h2>
+    <div class="examples">
+      <button (click)="loadExample('simple')">Simple Math</button>
+      <button (click)="loadExample('comparison')">Comparison</button>
+      <button (click)="loadExample('logical')">Logical</button>
+      <button (click)="loadExample('nested')">Nested Formulas</button>
+      <button (click)="loadExample('complex')">Complex Expression</button>
+    </div>
+  </div>
+</div>

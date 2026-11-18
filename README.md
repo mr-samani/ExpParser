@@ -71,8 +71,8 @@ Consequences:
 | Array indexing | `items[0].enabled` |
 | Arithmetic | `+`, `-`, `*`, `/`, `%`, `**` |
 | Comparison | `==`, `!=`, `===`, `!==`, `<`, `>`, `<=`, `>=` |
-| Logical | `&&`, `||`, `!` |
-| Grouping | `(isAdmin || isOwner) && isEnabled` |
+| Logical | `&&`, `\|\|`, `!` |
+| Grouping | `(isAdmin \|\| isOwner) && isEnabled` |
 | Legacy variable references | `[%discount%]` |
 | Legacy entity references | `@Q123ewr.A3tffdd` |
 
@@ -119,17 +119,13 @@ The existing registration-oriented API is retained:
 
 Use the reactive-model API for form state. Use the existing variable/entity API for scenarios where explicit registration is appropriate.
 
-## Angular 22 example
-
-A full standalone Angular 22 workspace with nested fields, checkboxes, array expressions, and an `@if` block is available in [examples/angular-22](examples/angular-22/README.md).
 
 From the repository root:
 
 ```bash
 npm install
 npm run build:lib
-cd examples/angular-22
-npm install
+
 npm start
 ```
 
@@ -137,7 +133,7 @@ This example installs its local library dependency from `../../dist/exp-parser`.
 
 ## Compatibility
 
-The library declares Angular peer dependencies `@angular/core >=21.0.0` and `@angular/common >=21.0.0`. The standalone example uses Angular 22 and TypeScript 6.0.x.
+The library declares Angular peer dependencies `@angular/core >=21.0.0` and `@angular/common >=21.0.0`. 
 
 ## Security notes
 
