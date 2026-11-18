@@ -70,7 +70,7 @@ export class ParserService {
   }
   private parseEqualityExpression(): ASTNode {
     let left = this.parseComparisonExpression();
-    while (this.match(TokenType.EQ, TokenType.NEQ)) left = this.binary(this.advance(), left, this.parseComparisonExpression());
+    while (this.match(TokenType.EQ, TokenType.NEQ, TokenType.STRICT_EQ, TokenType.STRICT_NEQ)) left = this.binary(this.advance(), left, this.parseComparisonExpression());
     return left;
   }
   private parseComparisonExpression(): ASTNode {
