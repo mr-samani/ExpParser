@@ -125,7 +125,3 @@ Reactive models are intended for plain objects and arrays. Avoid passing class i
 npm run build:lib
 npm test -- --watch=false
 ```
-
-## License
-
-MIT
