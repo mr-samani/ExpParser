@@ -10,6 +10,12 @@ import { BUILT_IN_FUNCTIONS, getAllFunctionNames } from './built-in-functions';
 import { BuiltInFunction } from '../models/BuiltInFunction';
 
 const ITERATE_KEY = Symbol('iterate');
+const MAX_AST_CACHE_SIZE = 500;
+
+interface AstFeatures {
+  readsVariables: boolean;
+  readsEntities: boolean;
+}
 
 @Injectable({ providedIn: 'root' })
 export class FormulaEngineService {
@@ -29,6 +35,7 @@ export class FormulaEngineService {
 
   private dependencyGraph = new Map<string, DependencyNode>();
   private astCache = new Map<string, ASTNode>();
+  private readonly astFeatures = new WeakMap<ASTNode, AstFeatures>();
 
   // Reactive-model internals. Dependencies are tracked per object/property,
   // so changing form.email does not invalidate an expression that only reads form.name.
@@ -237,20 +244,36 @@ export class FormulaEngineService {
 
   private getAst(expression: string): { ast: ASTNode | null; error?: string } {
     const cached = this.astCache.get(expression);
-    if (cached) return { ast: cached };
+    if (cached) {
+      // Refresh insertion order so frequently used expressions stay in the bounded cache.
+      this.astCache.delete(expression);
+      this.astCache.set(expression, cached);
+      return { ast: cached };
+    }
     const { tokens, errors: lexerErrors } = this.lexer.tokenize(expression);
     if (lexerErrors.length) return { ast: null, error: lexerErrors.map(e => e.message).join('; ') };
     const { ast, errors } = this.parser.parse(tokens);
     if (!ast || errors.length) return { ast: null, error: errors.map(e => e.message).join('; ') || 'Invalid expression' };
+    this.astFeatures.set(ast, {
+      readsVariables: containsNode(ast, 'VariableReference'),
+      readsEntities: containsNode(ast, 'EntityReference'),
+    });
     this.astCache.set(expression, ast);
+    if (this.astCache.size > MAX_AST_CACHE_SIZE) {
+      const oldestExpression = this.astCache.keys().next().value;
+      if (oldestExpression !== undefined) this.astCache.delete(oldestExpression);
+    }
     return { ast };
   }
 
   private buildEvaluationContext(ast?: ASTNode): EvaluationContext {
     // Do not subscribe a normal form expression to the engine's global variable/entity maps.
     // Explicit legacy references opt into those stores.
-    const variables = ast && containsNode(ast, 'VariableReference') ? this._variables() : new Map<string, Variable>();
-    const entities = ast && containsNode(ast, 'EntityReference') ? this._entities() : new Map<string, Entity>();
+    const features = ast ? this.astFeatures.get(ast) : undefined;
+    const readsVariables = features?.readsVariables ?? (ast ? containsNode(ast, 'VariableReference') : true);
+    const readsEntities = features?.readsEntities ?? (ast ? containsNode(ast, 'EntityReference') : true);
+    const variables = readsVariables ? this._variables() : new Map<string, Variable>();
+    const entities = readsEntities ? this._entities() : new Map<string, Entity>();
     return { variables: new Map(variables), entities: new Map(entities), functions: new Map() };
   }
 
