@@ -123,5 +123,5 @@ Reactive models are intended for plain objects and arrays. Avoid passing class i
 
 ```bash
 npm run build:lib
-npm test -- --watch=false
+npx ng test exp-parser
 ```
