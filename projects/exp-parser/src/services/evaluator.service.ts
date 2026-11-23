@@ -1,8 +1,17 @@
 import { Injectable } from '@angular/core';
 import { TokenType } from '../models/token.model';
 import {
-  ASTNode, ExpressionValue, FormulaValue, BinaryExpression, UnaryExpression,
-  FunctionCall, VariableReference, EntityReference, Identifier, MemberExpression, ArrayAccess,
+  ASTNode,
+  ExpressionValue,
+  FormulaValue,
+  BinaryExpression,
+  UnaryExpression,
+  FunctionCall,
+  VariableReference,
+  EntityReference,
+  Identifier,
+  MemberExpression,
+  ArrayAccess,
 } from '../models/ast.model';
 import { EvaluationContext } from '../models/formula.model';
 import { BUILT_IN_FUNCTIONS } from './built-in-functions';
@@ -18,19 +27,32 @@ export class EvaluatorService {
 
   evaluate(node: ASTNode): ExpressionValue {
     switch (node.type) {
-      case 'NumberLiteral': return (node as any).value;
-      case 'StringLiteral': return (node as any).value;
-      case 'BooleanLiteral': return (node as any).value;
-      case 'NullLiteral': return null;
-      case 'VariableReference': return this.evaluateVariableReference(node as VariableReference);
-      case 'EntityReference': return this.evaluateEntityReference(node as EntityReference);
-      case 'Identifier': return this.evaluateIdentifier(node as Identifier);
-      case 'BinaryExpression': return this.evaluateBinaryExpression(node as BinaryExpression);
-      case 'UnaryExpression': return this.evaluateUnaryExpression(node as UnaryExpression);
-      case 'FunctionCall': return this.evaluateFunctionCall(node as FunctionCall);
-      case 'MemberExpression': return this.evaluateMemberExpression(node as MemberExpression);
-      case 'ArrayAccess': return this.evaluateArrayAccess(node as ArrayAccess);
-      default: throw new Error(`Unknown node type: ${node.type}`);
+      case 'NumberLiteral':
+        return (node as any).value;
+      case 'StringLiteral':
+        return (node as any).value;
+      case 'BooleanLiteral':
+        return (node as any).value;
+      case 'NullLiteral':
+        return null;
+      case 'VariableReference':
+        return this.evaluateVariableReference(node as VariableReference);
+      case 'EntityReference':
+        return this.evaluateEntityReference(node as EntityReference);
+      case 'Identifier':
+        return this.evaluateIdentifier(node as Identifier);
+      case 'BinaryExpression':
+        return this.evaluateBinaryExpression(node as BinaryExpression);
+      case 'UnaryExpression':
+        return this.evaluateUnaryExpression(node as UnaryExpression);
+      case 'FunctionCall':
+        return this.evaluateFunctionCall(node as FunctionCall);
+      case 'MemberExpression':
+        return this.evaluateMemberExpression(node as MemberExpression);
+      case 'ArrayAccess':
+        return this.evaluateArrayAccess(node as ArrayAccess);
+      default:
+        throw new Error(`Unknown node type: ${node.type}`);
     }
   }
 
@@ -50,9 +72,35 @@ export class EvaluatorService {
   }
 
   private evaluateEntityReference(node: EntityReference): ExpressionValue {
+    const entityKey = `@${node.entityId}`;
+    const scope = this.context.scope;
+
+    // First, resolve the entity from the reactive model.
+    if (scope && Reflect.has(scope, entityKey)) {
+      const entity = Reflect.get(scope, entityKey);
+
+      if (entity === null || typeof entity !== 'object') {
+        throw new Error(`Entity not found: @${node.entityId}.${node.field}`);
+      }
+
+      if (!(node.field in entity)) {
+        throw new Error(`Field '${node.field}' not found in entity @${node.entityId}`);
+      }
+
+      return Reflect.get(entity, node.field);
+    }
+
+    // Backward compatibility with manually registered entities.
     const entity = this.context.entities.get(node.entityId);
-    if (!entity) throw new Error(`Entity not found: @${node.entityId}.${node.field}`);
-    if (!(node.field in entity)) throw new Error(`Field '${node.field}' not found in entity @${node.entityId}`);
+
+    if (!entity) {
+      throw new Error(`Entity not found: @${node.entityId}.${node.field}`);
+    }
+
+    if (!(node.field in entity)) {
+      throw new Error(`Field '${node.field}' not found in entity @${node.entityId}`);
+    }
+
     return Reflect.get(entity, node.field);
   }
 
@@ -61,8 +109,12 @@ export class EvaluatorService {
     if (object === null || object === undefined) {
       throw new Error(`Cannot read property '${node.property}' of ${object}`);
     }
-    if (BLOCKED_PROPERTIES.has(node.property)) throw new Error('Access to this property is not allowed');
-    if ((typeof object !== 'object' && typeof object !== 'string') || !(node.property in Object(object))) {
+    if (BLOCKED_PROPERTIES.has(node.property))
+      throw new Error('Access to this property is not allowed');
+    if (
+      (typeof object !== 'object' && typeof object !== 'string') ||
+      !(node.property in Object(object))
+    ) {
       throw new Error(`Property '${node.property}' does not exist`);
     }
     return Reflect.get(Object(object), node.property);
@@ -72,7 +124,8 @@ export class EvaluatorService {
     const object = this.evaluate(node.object);
     const index = this.evaluate(node.index);
     if (object === null || object === undefined) throw new Error('Cannot index null or undefined');
-    if (typeof index !== 'number' && typeof index !== 'string') throw new Error('Array index must be a number or string');
+    if (typeof index !== 'number' && typeof index !== 'string')
+      throw new Error('Array index must be a number or string');
     const key = String(index);
     if (BLOCKED_PROPERTIES.has(key)) throw new Error('Access to this property is not allowed');
     if (!(key in Object(object))) throw new Error(`Index '${key}' does not exist`);
@@ -83,44 +136,69 @@ export class EvaluatorService {
     const left = this.evaluate(node.left);
 
     // Real short-circuiting is important for both performance and dynamic signal dependencies.
-    if (node.operator === TokenType.AND) return this.isTruthy(left) ? this.isTruthy(this.evaluate(node.right)) : false;
-    if (node.operator === TokenType.OR) return this.isTruthy(left) ? true : this.isTruthy(this.evaluate(node.right));
+    if (node.operator === TokenType.AND)
+      return this.isTruthy(left) ? this.isTruthy(this.evaluate(node.right)) : false;
+    if (node.operator === TokenType.OR)
+      return this.isTruthy(left) ? true : this.isTruthy(this.evaluate(node.right));
 
     const right = this.evaluate(node.right);
     switch (node.operator) {
-      case TokenType.PLUS: return this.add(left as FormulaValue, right as FormulaValue);
-      case TokenType.MINUS: return this.subtract(left as FormulaValue, right as FormulaValue);
-      case TokenType.MULTIPLY: return this.multiply(left as FormulaValue, right as FormulaValue);
-      case TokenType.DIVIDE: return this.divide(left as FormulaValue, right as FormulaValue);
-      case TokenType.MODULO: return this.modulo(left as FormulaValue, right as FormulaValue);
-      case TokenType.POWER: return this.power(left as FormulaValue, right as FormulaValue);
-      case TokenType.EQ: return this.equals(left as FormulaValue, right as FormulaValue);
-      case TokenType.NEQ: return !this.equals(left as FormulaValue, right as FormulaValue);
-      case TokenType.STRICT_EQ: return left === right;
-      case TokenType.STRICT_NEQ: return left !== right;
-      case TokenType.LT: return this.lessThan(left as FormulaValue, right as FormulaValue);
-      case TokenType.GT: return this.greaterThan(left as FormulaValue, right as FormulaValue);
-      case TokenType.LTE: return this.equals(left as FormulaValue, right as FormulaValue) || this.lessThan(left as FormulaValue, right as FormulaValue);
-      case TokenType.GTE: return this.equals(left as FormulaValue, right as FormulaValue) || this.greaterThan(left as FormulaValue, right as FormulaValue);
-      default: throw new Error(`Unknown operator: ${node.operator}`);
+      case TokenType.PLUS:
+        return this.add(left as FormulaValue, right as FormulaValue);
+      case TokenType.MINUS:
+        return this.subtract(left as FormulaValue, right as FormulaValue);
+      case TokenType.MULTIPLY:
+        return this.multiply(left as FormulaValue, right as FormulaValue);
+      case TokenType.DIVIDE:
+        return this.divide(left as FormulaValue, right as FormulaValue);
+      case TokenType.MODULO:
+        return this.modulo(left as FormulaValue, right as FormulaValue);
+      case TokenType.POWER:
+        return this.power(left as FormulaValue, right as FormulaValue);
+      case TokenType.EQ:
+        return this.equals(left as FormulaValue, right as FormulaValue);
+      case TokenType.NEQ:
+        return !this.equals(left as FormulaValue, right as FormulaValue);
+      case TokenType.STRICT_EQ:
+        return left === right;
+      case TokenType.STRICT_NEQ:
+        return left !== right;
+      case TokenType.LT:
+        return this.lessThan(left as FormulaValue, right as FormulaValue);
+      case TokenType.GT:
+        return this.greaterThan(left as FormulaValue, right as FormulaValue);
+      case TokenType.LTE:
+        return (
+          this.equals(left as FormulaValue, right as FormulaValue) ||
+          this.lessThan(left as FormulaValue, right as FormulaValue)
+        );
+      case TokenType.GTE:
+        return (
+          this.equals(left as FormulaValue, right as FormulaValue) ||
+          this.greaterThan(left as FormulaValue, right as FormulaValue)
+        );
+      default:
+        throw new Error(`Unknown operator: ${node.operator}`);
     }
   }
 
   private evaluateUnaryExpression(node: UnaryExpression): FormulaValue {
     const operand = this.evaluate(node.operand);
     switch (node.operator) {
-      case TokenType.NOT: return !this.isTruthy(operand);
+      case TokenType.NOT:
+        return !this.isTruthy(operand);
       case TokenType.MINUS:
         if (typeof operand !== 'number') throw new Error('Unary minus requires a number');
         return -operand;
-      default: throw new Error(`Unknown unary operator: ${node.operator}`);
+      default:
+        throw new Error(`Unknown unary operator: ${node.operator}`);
     }
   }
 
   private evaluateFunctionCall(node: FunctionCall): FormulaValue {
     const fn = BUILT_IN_FUNCTIONS[node.name.toUpperCase()];
     if (!fn) throw new Error(`Unknown function: ${node.name}()`);
-    return fn(node.arguments.map(arg => this.evaluate(arg)) as FormulaValue[]);
+    return fn(node.arguments.map((arg) => this.evaluate(arg)) as FormulaValue[]);
   }
 
   private add(a: FormulaValue, b: FormulaValue): FormulaValue {

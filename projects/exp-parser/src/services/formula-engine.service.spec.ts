@@ -59,9 +59,7 @@ describe('FormulaEngineService reactive expressions', () => {
       right: true,
     });
 
-    const result = computed(() =>
-      engine.eval('enabled && left || right', form) === true,
-    );
+    const result = computed(() => engine.eval('enabled && left || right', form) === true);
 
     expect(result()).toBe(true);
     form.right = false;
@@ -98,4 +96,25 @@ describe('FormulaEngineService reactive expressions', () => {
     expect(engine.eval("1 !== '1'")).toBe(true);
   });
 
+  it('check entity refrence', () => {
+    const engine = createEngine();
+    const form = engine.createReactiveModel({
+      '@Q123': {
+        A456: false,
+        A789: true,
+      },
+    });
+
+    expect(engine.eval('@Q123.A456', form)).toBe(false);
+    expect(engine.eval('@Q123.A789', form)).toBe(true);
+
+    form['@Q123']['A456'] = true;
+
+    expect(engine.eval('@Q123.A456', form)).toBe(true);
+
+    const result = computed(() => engine.eval('@Q123.A456', form));
+    expect(result()).toBe(false);
+    form['@Q123']['A456'] = true;
+    expect(result()).toBe(true);
+  });
 });
