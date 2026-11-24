@@ -109,9 +109,9 @@ describe('FormulaEngineService reactive expressions', () => {
     expect(engine.eval('@Q123.A789', form)).toBe(true);
 
     form['@Q123']['A456'] = true;
-
     expect(engine.eval('@Q123.A456', form)).toBe(true);
 
+    form['@Q123']['A456'] = false;
     const result = computed(() => engine.eval('@Q123.A456', form));
     expect(result()).toBe(false);
     form['@Q123']['A456'] = true;
