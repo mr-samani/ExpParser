@@ -6,6 +6,8 @@ export interface FormulaDefinition {
   ast?: ASTNode;
   dependencies: Set<string>;
   isValid: boolean;
+  /** True when the formula calls a time-dependent or otherwise impure function. */
+  isVolatile?: boolean;
   error?: string;
 }
 

@@ -125,3 +125,7 @@ The exported `ExpressionAnalyzer` extracts full paths (for example, `customer.ad
 
 Formula dependency traversal uses an iterative topological sort, avoiding recursive call-stack growth and reporting cycles rather than silently returning a partial order. Exponentiation is right-associative and follows conventional unary precedence: `-2 ** 2` evaluates to `-4`.
 
+
+### Volatile functions
+
+Built-in `NOW()` and `TODAY()` are marked volatile. Custom functions are also treated as volatile by default; declare a custom function pure only when it is deterministic and has no external side effects: `registerFunction('DOUBLE', args => Number(args[0]) * 2, { pure: true })`. `FormulaDefinition.isVolatile` exposes this metadata so a host runtime can schedule explicit refreshes for clock-dependent or impure formulas. The expression engine does not create a timer or refresh volatile formulas automatically.

@@ -43,7 +43,10 @@ export class FormulaEngineService {
   private readonly bytecodeEvaluator = new BytecodeEvaluator();
   private readonly expressionAnalyzer = new ExpressionAnalyzer();
   private readonly bytecodeCache = new Map<string, BytecodeProgram>();
+  private readonly formulaPrograms = new WeakMap<FormulaDefinition, BytecodeProgram>();
   private readonly customFunctions = new Map<string, BuiltInFunction>();
+  private readonly pureFunctions = new Set(getAllFunctionNames().filter(name => name !== 'NOW' && name !== 'TODAY'));
+  private readonly functionRegistry = new Map<string, Function>(Object.entries(BUILT_IN_FUNCTIONS));
   private readonly maxBytecodeCacheSize = 4096;
 
   // Reactive-model internals. Dependencies are tracked per object/property,
@@ -68,7 +71,13 @@ export class FormulaEngineService {
     this.setVariable('NULL', null);
   }
 
-  registerFunction(name: string, fn: BuiltInFunction): void { this.customFunctions.set(name.toUpperCase(), fn); }
+  registerFunction(name: string, fn: BuiltInFunction, options: { pure?: boolean } = {}): void {
+    const key = name.toUpperCase();
+    this.customFunctions.set(key, fn);
+    this.functionRegistry.set(key, fn);
+    if (options.pure === true) this.pureFunctions.add(key);
+    else this.pureFunctions.delete(key);
+  }
 
   /**
    * Converts a plain object/array graph into a deeply reactive model.
@@ -180,9 +189,12 @@ export class FormulaEngineService {
       this.updateError(id, error);
       return { id, expression, isValid: false, error, dependencies: new Set() };
     }
+    const analysis = this.expressionAnalyzer.analyze(parsed.ast, name => this.pureFunctions.has(name));
     const dependencies = this.extractDependencies(parsed.ast);
     this.updateDependencyGraph(id, dependencies);
-    const formula: FormulaDefinition = { id, expression, ast: parsed.ast, dependencies, isValid: true };
+    const isVolatile = analysis.some(dependency => dependency.kind === 'function' && dependency.volatile === true);
+    const formula: FormulaDefinition = { id, expression, ast: parsed.ast, dependencies, isValid: true, isVolatile };
+    this.formulaPrograms.set(formula, this.bytecodeCompiler.compile(parsed.ast));
     this._formulas.update(map => new Map(map).set(id, formula));
     this.clearError(id);
 
@@ -212,12 +224,14 @@ export class FormulaEngineService {
       if (!formula?.isValid || !formula.ast) {
         return { success: false, error: formula?.error ?? `Formula not found: ${id}`, executionTime: performance.now() - startTime };
       }
-      const context = this.buildEvaluationContext(formula.ast);
+      const context = this.buildEvaluationContext(formula.ast, true);
       const sortedIds = this.topologicalSort([id]);
       for (const evalId of sortedIds) {
         const item = this._formulas().get(evalId);
         if (item?.ast) {
-          const value = this.evaluateAst(item.ast, context, item.expression);
+          const program = this.formulaPrograms.get(item) ?? this.bytecodeCompiler.compile(item.ast);
+          this.formulaPrograms.set(item, program);
+          const value = this.bytecodeEvaluator.evaluate(program, context);
           context.variables.set(`__formula_${evalId}`, { name: `__formula_${evalId}`, value: value as FormulaValue });
           if (evalId === id) return { success: true, value, executionTime: performance.now() - startTime };
         }
@@ -242,7 +256,7 @@ export class FormulaEngineService {
   eval(expression: string, scope?: object): ExpressionValue {
     const parsed = this.getAst(expression);
     if (!parsed.ast) throw new Error(parsed.error ?? 'Invalid expression');
-    const context = { ...this.buildEvaluationContext(parsed.ast), scope };
+    const context = { ...this.buildEvaluationContext(parsed.ast, false, scope), scope };
     return this.evaluateAst(parsed.ast, context, expression);
   }
 
@@ -280,19 +294,31 @@ export class FormulaEngineService {
     return { ast };
   }
 
-  private buildEvaluationContext(ast?: ASTNode): EvaluationContext {
+  private buildEvaluationContext(ast?: ASTNode, cloneStores = false, scope?: object): EvaluationContext {
     // Do not subscribe a normal form expression to the engine's global variable/entity maps.
     // Explicit legacy references opt into those stores.
     const features = ast ? this.astFeatures.get(ast) : undefined;
-    const readsVariables = features?.readsVariables ?? (ast ? containsNode(ast, 'VariableReference') : true);
+    const hasIdentifier = ast ? containsNode(ast, 'Identifier') : false;
+    const identifierRoots = ast
+      ? this.expressionAnalyzer.analyze(ast)
+          .filter(item => item.kind === 'identifier' && !item.path.includes('.') && !item.path.includes('['))
+          .map(item => item.path)
+      : [];
+    const scopeCoversIdentifiers = !!scope && identifierRoots.every(name => Object.prototype.hasOwnProperty.call(scope, name));
+    const readsVariables = (features?.readsVariables ?? (ast ? containsNode(ast, 'VariableReference') : true))
+      || (hasIdentifier && !scopeCoversIdentifiers);
     const readsEntities = features?.readsEntities ?? (ast ? containsNode(ast, 'EntityReference') : true);
     const variables = readsVariables ? this._variables() : new Map<string, Variable>();
     const entities = readsEntities ? this._entities() : new Map<string, Entity>();
-    return { variables: new Map(variables), entities: new Map(entities), functions: new Map([...Object.entries(BUILT_IN_FUNCTIONS), ...this.customFunctions]) };
+    return {
+      variables: cloneStores ? new Map(variables) : variables,
+      entities: cloneStores ? new Map(entities) : entities,
+      functions: this.functionRegistry,
+    };
   }
 
   private extractDependencies(ast: ASTNode): Set<string> {
-    return new Set(this.expressionAnalyzer.analyze(ast).map(dependency => {
+    return new Set(this.expressionAnalyzer.analyze(ast, name => this.pureFunctions.has(name)).map(dependency => {
       if (dependency.kind === 'variable') return `[%${dependency.path}%]`;
       if (dependency.kind === 'entity') return dependency.path;
       if (dependency.kind === 'function') return `fn:${dependency.path}`;

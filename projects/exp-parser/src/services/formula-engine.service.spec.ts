@@ -133,3 +133,78 @@ describe('Expression dependency analyzer', () => {
     expect(dependencies.some(item => item.path === 'index')).toBe(true);
   });
 });
+
+
+describe('Bytecode execution', () => {
+  it('uses correct unary and exponentiation precedence and resolves identifiers', () => {
+    const engine = createEngine();
+    expect(engine.eval('-2 ** 2')).toBe(-4);
+    expect(engine.eval('2 ** 3 ** 2')).toBe(512);
+    expect(engine.eval('2 ** -2')).toBe(0.25);
+    expect(engine.eval('PI')).toBe(Math.PI);
+    engine.setVariable('customValue', 12);
+    expect(engine.eval('customValue * 2')).toBe(24);
+  });
+
+  it('short-circuits IF, AND and OR function calls', () => {
+    const engine = createEngine();
+    let calls = 0;
+    engine.registerFunction('TICK', () => { calls++; return true; });
+    expect(engine.eval('IF(false, TICK(), 7)')).toBe(7);
+    expect(engine.eval('AND(false, TICK())')).toBe(false);
+    expect(engine.eval('OR(true, TICK())')).toBe(true);
+    expect(calls).toBe(0);
+  });
+
+  it('tracks only the active IF branch in Angular computed signals', () => {
+    const engine = createEngine();
+    const form = engine.createReactiveModel({ enabled: true, left: 1, right: 2 });
+    let calls = 0;
+    engine.registerFunction('COUNT', args => { calls++; return args[0] as number; });
+    const value = computed(() => engine.eval('IF(enabled, COUNT(left), COUNT(right))', form));
+    expect(value()).toBe(1);
+    expect(calls).toBe(1);
+    form.right = 3;
+    expect(value()).toBe(1);
+    expect(calls).toBe(1);
+    form.enabled = false;
+    expect(value()).toBe(3);
+    expect(calls).toBe(2);
+  });
+
+  it('detects circular formula dependencies', () => {
+    const engine = createEngine();
+    engine.registerFormula('alpha', '[%beta%]');
+    engine.registerFormula('beta', '[%alpha%]');
+    const result = engine.evaluateFormula('alpha');
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Circular formula dependency');
+  });
+
+  it('rejects malformed and overflowing numeric literals', () => {
+    const engine = createEngine();
+    expect(engine.validateExpression('1e+').valid).toBe(false);
+    expect(engine.validateExpression('1e9999').valid).toBe(false);
+  });
+
+  it('keeps custom functions isolated between engine instances', () => {
+    const first = createEngine();
+    const second = createEngine();
+    first.registerFunction('ONLY_FIRST', () => 10);
+    expect(first.eval('ONLY_FIRST()')).toBe(10);
+    expect(() => second.eval('ONLY_FIRST()')).toThrow();
+  });
+});
+
+
+describe('Formula volatility metadata', () => {
+  it('marks clock-dependent and custom impure functions as volatile', () => {
+    const engine = createEngine();
+    expect(engine.registerFormula('clock', 'NOW()').isVolatile).toBe(true);
+    engine.registerFunction('CUSTOM_CLOCK', () => 'now');
+    expect(engine.registerFormula('customClock', 'CUSTOM_CLOCK()').isVolatile).toBe(true);
+    engine.registerFunction('PURE_CUSTOM', () => 5, { pure: true });
+    expect(engine.registerFormula('pure', 'PURE_CUSTOM()').isVolatile).toBe(false);
+    expect(engine.registerFormula('math', 'SUM(1, 2)').isVolatile).toBe(false);
+  });
+});
