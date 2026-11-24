@@ -86,15 +86,17 @@ export class ParserService {
     return left;
   }
   private parseMultiplicationExpression(): ASTNode {
-    let left = this.parsePowerExpression();
+    let left = this.parseUnaryExpression();
     while (this.match(TokenType.MULTIPLY, TokenType.DIVIDE, TokenType.MODULO)) {
-      left = this.binary(this.advance(), left, this.parsePowerExpression());
+      left = this.binary(this.advance(), left, this.parseUnaryExpression());
     }
     return left;
   }
   private parsePowerExpression(): ASTNode {
-    let left = this.parseUnaryExpression();
-    if (this.match(TokenType.POWER)) left = this.binary(this.advance(), left, this.parsePowerExpression());
+    const left = this.parsePostfixExpression();
+    if (this.match(TokenType.POWER)) {
+      return this.binary(this.advance(), left, this.parseUnaryExpression());
+    }
     return left;
   }
   private parseUnaryExpression(): ASTNode {
@@ -102,7 +104,7 @@ export class ParserService {
       const operator = this.advance();
       return { type: 'UnaryExpression', operator: operator.type, operand: this.parseUnaryExpression(), token: operator } as UnaryExpression;
     }
-    return this.parsePostfixExpression();
+    return this.parsePowerExpression();
   }
 
   private parsePostfixExpression(): ASTNode {

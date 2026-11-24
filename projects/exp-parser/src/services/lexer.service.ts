@@ -130,14 +130,20 @@ export class LexerService {
       while (this.isDigit(this.peek())) this.advance();
     }
     if (this.peek() === 'e' || this.peek() === 'E') {
-      const next = this.peek(1);
-      if (this.isDigit(next) || next === '+' || next === '-') {
-        this.advance();
-        if (this.peek() === '+' || this.peek() === '-') this.advance();
+      const exponentPosition = this.position;
+      this.advance();
+      if (this.peek() === '+' || this.peek() === '-') this.advance();
+      if (!this.isDigit(this.peek())) {
+        this.errors.push({ message: 'Invalid numeric exponent', position: exponentPosition });
+      } else {
         while (this.isDigit(this.peek())) this.advance();
       }
     }
-    const value = Number(this.input.slice(start, this.position));
+    const raw = this.input.slice(start, this.position);
+    const value = Number(raw);
+    if (!Number.isFinite(value)) {
+      this.errors.push({ message: 'Numeric literal is outside the finite number range', position: start });
+    }
     this.tokens.push({
       type: TokenType.NUMBER, value: Number.isFinite(value) ? value : 0,
       position: start, length: this.position - start,
@@ -162,7 +168,6 @@ export class LexerService {
     const twoCharOps: Record<string, TokenType> = {
       '==': TokenType.EQ, '!=': TokenType.NEQ, '&&': TokenType.AND, '||': TokenType.OR,
       '<=': TokenType.LTE, '>=': TokenType.GTE, '**': TokenType.POWER,
-      '+=': TokenType.PLUS, '-=': TokenType.MINUS,
     };
     if (twoCharOps[two]) {
       this.position += 2;

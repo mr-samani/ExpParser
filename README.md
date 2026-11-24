@@ -148,3 +148,19 @@ npm install
 npm run build:lib
 npm test
 ```
+
+
+## Execution engine and dependency analysis
+
+Expressions are compiled to immutable stack-based bytecode after parsing. Repeated evaluations reuse a bounded LRU cache (4,096 programs), avoiding tokenization, parsing, and AST tree-walking on the hot path. The interpreter uses an explicit evaluation context and does not generate JavaScript or use `eval()` / `new Function()`.
+
+Logical operators and the `IF`, `AND`, and `OR` functions short-circuit. This keeps inactive branches out of Angular Signals' dependency tracking. Custom functions registered with a `FormulaEngineService` instance are isolated to that instance.
+
+The exported `ExpressionAnalyzer` extracts full paths (for example, `customer.address.city`), variable and entity references, function names, and dynamic array-index dependencies. Dynamic indexes are marked because their exact property cannot be determined statically.
+
+Formula dependency traversal uses an iterative topological sort, avoiding recursive call-stack growth and reporting cycles rather than silently returning a partial order. Exponentiation is right-associative and follows conventional unary precedence: `-2 ** 2` evaluates to `-4`.
+
+
+### Volatile functions
+
+Built-in `NOW()` and `TODAY()` are marked volatile. Custom functions are also treated as volatile by default; declare a custom function pure only when it is deterministic and has no external side effects: `registerFunction('DOUBLE', args => Number(args[0]) * 2, { pure: true })`. `FormulaDefinition.isVolatile` exposes this metadata so a host runtime can schedule explicit refreshes for clock-dependent or impure formulas. The expression engine does not create a timer or refresh volatile formulas automatically.
