@@ -118,3 +118,18 @@ describe('FormulaEngineService reactive expressions', () => {
     expect(result()).toBe(true);
   });
 });
+
+
+describe('Expression dependency analyzer', () => {
+  it('preserves full nested paths and marks dynamic indexes', async () => {
+    const { ExpressionAnalyzer } = await import('./expression-analyzer');
+    const lexer = new LexerService();
+    const parser = new ParserService();
+    const tokens = lexer.tokenize('customer.address.city && rows[index].enabled').tokens;
+    const ast = parser.parse(tokens).ast!;
+    const dependencies = new ExpressionAnalyzer().analyze(ast);
+    expect(dependencies.some(item => item.path === 'customer.address.city')).toBe(true);
+    expect(dependencies.some(item => item.kind === 'dynamic-index' && item.path === 'rows[*]')).toBe(true);
+    expect(dependencies.some(item => item.path === 'index')).toBe(true);
+  });
+});

@@ -12,3 +12,4 @@ export *  from './models/BuiltInFunction';
 export * from './models/ast.model';
 export * from './models/formula.model';
 export * from './models/token.model';
+\nexport * from './services/bytecode-compiler';\nexport * from './services/expression-analyzer';\n

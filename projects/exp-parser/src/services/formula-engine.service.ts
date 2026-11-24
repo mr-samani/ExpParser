@@ -8,9 +8,12 @@ import {
 } from '../models/formula.model';
 import { BUILT_IN_FUNCTIONS, getAllFunctionNames } from './built-in-functions';
 import { BuiltInFunction } from '../models/BuiltInFunction';
+import { BytecodeCompiler, BytecodeProgram } from './bytecode-compiler';
+import { BytecodeEvaluator } from './bytecode-evaluator';
+import { ExpressionAnalyzer } from './expression-analyzer';
 
 const ITERATE_KEY = Symbol('iterate');
-const MAX_AST_CACHE_SIZE = 500;
+const MAX_AST_CACHE_SIZE = 2048;
 
 interface AstFeatures {
   readsVariables: boolean;
@@ -36,6 +39,12 @@ export class FormulaEngineService {
   private dependencyGraph = new Map<string, DependencyNode>();
   private astCache = new Map<string, ASTNode>();
   private readonly astFeatures = new WeakMap<ASTNode, AstFeatures>();
+  private readonly bytecodeCompiler = new BytecodeCompiler();
+  private readonly bytecodeEvaluator = new BytecodeEvaluator();
+  private readonly expressionAnalyzer = new ExpressionAnalyzer();
+  private readonly bytecodeCache = new Map<string, BytecodeProgram>();
+  private readonly customFunctions = new Map<string, BuiltInFunction>();
+  private readonly maxBytecodeCacheSize = 4096;
 
   // Reactive-model internals. Dependencies are tracked per object/property,
   // so changing form.email does not invalidate an expression that only reads form.name.
@@ -59,7 +68,7 @@ export class FormulaEngineService {
     this.setVariable('NULL', null);
   }
 
-  registerFunction(name: string, fn: BuiltInFunction): void { BUILT_IN_FUNCTIONS[name.toUpperCase()] = fn; }
+  registerFunction(name: string, fn: BuiltInFunction): void { this.customFunctions.set(name.toUpperCase(), fn); }
 
   /**
    * Converts a plain object/array graph into a deeply reactive model.
@@ -208,8 +217,7 @@ export class FormulaEngineService {
       for (const evalId of sortedIds) {
         const item = this._formulas().get(evalId);
         if (item?.ast) {
-          this.evaluator.setContext(context);
-          const value = this.evaluator.evaluate(item.ast);
+          const value = this.evaluateAst(item.ast, context, item.expression);
           context.variables.set(`__formula_${evalId}`, { name: `__formula_${evalId}`, value: value as FormulaValue });
           if (evalId === id) return { success: true, value, executionTime: performance.now() - startTime };
         }
@@ -234,8 +242,8 @@ export class FormulaEngineService {
   eval(expression: string, scope?: object): ExpressionValue {
     const parsed = this.getAst(expression);
     if (!parsed.ast) throw new Error(parsed.error ?? 'Invalid expression');
-    this.evaluator.setContext({ ...this.buildEvaluationContext(parsed.ast), scope });
-    return this.evaluator.evaluate(parsed.ast);
+    const context = { ...this.buildEvaluationContext(parsed.ast), scope };
+    return this.evaluateAst(parsed.ast, context, expression);
   }
 
   evaluateExpression(expression: string, scope?: object): EvaluationResult {
@@ -280,24 +288,40 @@ export class FormulaEngineService {
     const readsEntities = features?.readsEntities ?? (ast ? containsNode(ast, 'EntityReference') : true);
     const variables = readsVariables ? this._variables() : new Map<string, Variable>();
     const entities = readsEntities ? this._entities() : new Map<string, Entity>();
-    return { variables: new Map(variables), entities: new Map(entities), functions: new Map() };
+    return { variables: new Map(variables), entities: new Map(entities), functions: new Map([...Object.entries(BUILT_IN_FUNCTIONS), ...this.customFunctions]) };
   }
 
   private extractDependencies(ast: ASTNode): Set<string> {
-    const deps = new Set<string>();
-    const visit = (node: ASTNode): void => {
-      switch (node.type) {
-        case 'VariableReference': deps.add(`[%${(node as any).name}%]`); break;
-        case 'EntityReference': deps.add(`@${(node as any).entityId}.${(node as any).field}`); break;
-        case 'MemberExpression': visit((node as any).object); deps.add((node as any).property); break;
-        case 'ArrayAccess': visit((node as any).object); visit((node as any).index); break;
-        case 'BinaryExpression': visit((node as any).left); visit((node as any).right); break;
-        case 'UnaryExpression': visit((node as any).operand); break;
-        case 'FunctionCall': (node as any).arguments.forEach(visit); break;
+    return new Set(this.expressionAnalyzer.analyze(ast).map(dependency => {
+      if (dependency.kind === 'variable') return `[%${dependency.path}%]`;
+      if (dependency.kind === 'entity') return dependency.path;
+      if (dependency.kind === 'function') return `fn:${dependency.path}`;
+      return dependency.path;
+    }));
+  }
+
+  private evaluateAst(ast: ASTNode, context: EvaluationContext, cacheKey?: string): ExpressionValue {
+    const key = cacheKey ?? this.findExpressionForAst(ast);
+    let program = key ? this.bytecodeCache.get(key) : undefined;
+    if (!program) {
+      program = this.bytecodeCompiler.compile(ast);
+      if (key) {
+        this.bytecodeCache.set(key, program);
+        if (this.bytecodeCache.size > this.maxBytecodeCacheSize) {
+          const oldest = this.bytecodeCache.keys().next().value;
+          if (oldest !== undefined) this.bytecodeCache.delete(oldest);
+        }
       }
-    };
-    visit(ast);
-    return deps;
+    } else if (key) {
+      this.bytecodeCache.delete(key);
+      this.bytecodeCache.set(key, program);
+    }
+    return this.bytecodeEvaluator.evaluate(program, context);
+  }
+
+  private findExpressionForAst(ast: ASTNode): string | undefined {
+    for (const [expression, cachedAst] of this.astCache) if (cachedAst === ast) return expression;
+    return undefined;
   }
 
   private updateDependencyGraph(id: string, dependencies: Set<string>): void {
@@ -316,21 +340,47 @@ export class FormulaEngineService {
   }
 
   private topologicalSort(ids: string[]): string[] {
-    const visited = new Set<string>();
+    // Iterative Kahn traversal avoids stack overflow on long formula chains.
+    const reachable = new Set<string>();
+    const pending = [...ids];
+    while (pending.length) {
+      const id = pending.pop()!;
+      if (reachable.has(id)) continue;
+      reachable.add(id);
+      for (const dependency of this.dependencyGraph.get(id)?.dependsOn ?? []) pending.push(dependency);
+    }
+    const remaining = new Map<string, number>();
+    const dependents = new Map<string, string[]>();
+    for (const id of reachable) {
+      const dependencies = [...(this.dependencyGraph.get(id)?.dependsOn ?? [])].filter(dep => reachable.has(dep));
+      remaining.set(id, dependencies.length);
+      for (const dependency of dependencies) {
+        const list = dependents.get(dependency) ?? [];
+        list.push(id);
+        dependents.set(dependency, list);
+      }
+    }
+    const ready = [...remaining].filter(([, count]) => count === 0).map(([id]) => id);
     const result: string[] = [];
-    const visit = (id: string): void => {
-      if (visited.has(id)) return;
-      visited.add(id);
-      for (const dep of this.dependencyGraph.get(id)?.dependsOn ?? []) visit(dep);
+    for (let cursor = 0; cursor < ready.length; cursor++) {
+      const id = ready[cursor];
       result.push(id);
-    };
-    ids.forEach(visit);
+      for (const dependent of dependents.get(id) ?? []) {
+        const count = remaining.get(dependent)! - 1;
+        remaining.set(dependent, count);
+        if (count === 0) ready.push(dependent);
+      }
+    }
+    if (result.length !== reachable.size) {
+      const cyclic = [...remaining].filter(([, count]) => count > 0).map(([id]) => id);
+      throw new Error(`Circular formula dependency detected: ${cyclic.join(', ')}`);
+    }
     return result;
   }
 
   private updateError(id: string, error: string): void { this._errors.update(map => new Map(map).set(id, error)); }
   private clearError(id: string): void { this._errors.update(map => { const next = new Map(map); next.delete(id); return next; }); }
-  getAvailableFunctions(): string[] { return getAllFunctionNames(); }
+  getAvailableFunctions(): string[] { return [...new Set([...getAllFunctionNames(), ...this.customFunctions.keys()])]; }
 
   validateExpression(expression: string): { valid: boolean; errors: string[] } {
     const parsed = this.getAst(expression);
@@ -344,6 +394,7 @@ export class FormulaEngineService {
     this._errors.set(new Map());
     this.dependencyGraph.clear();
     this.astCache.clear();
+    this.bytecodeCache.clear();
     this.initializeBuiltInVariables();
   }
 }
